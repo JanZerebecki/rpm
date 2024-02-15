@@ -1033,14 +1033,34 @@ static void genCpioListAndHeader(FileList fl, Package pkg, int isSrc)
     rpm_loff_t totalFileSize = 0;
     Header h = pkg->header; /* just a shortcut */
     int override_date = 0;
+    int set_mtime = 0;
     time_t source_date_epoch = 0;
     char *srcdate = getenv("SOURCE_DATE_EPOCH");
+    char *msrcdate = getenv("SOURCE_DATE_EPOCH_MTIME");
 
-    /* Limit the maximum date to SOURCE_DATE_EPOCH if defined
-     * similar to the tar --clamp-mtime option
+    /* If SOURCE_DATE_EPOCH_MTIME is set use it for file modification time
+     * stamps, it is supposed to be newer. This can be used if we might want to
+     * compare if the file content remains the same when a build dependency
+     * changes while a build script embeds SOURCE_DATE_EPOCH in the file
+     * content. mtimes are required to increase with new versions and releases
+     * of an rpm with the same name, as rsync without --checksum and similar
+     * tools would get confused if the content changes without newer mtime. */
+    if (newsrcdate != NULL) {
+	srcdate = msrcdate;
+    }
+
+    /* Set the file mtime to SOURCE_DATE_EPOCH it if requested to make the
+     * resulting rpm reproducible.
      * https://reproducible-builds.org/specs/source-date-epoch/
+     *
+     * For backwards compatibility clamp / limit the maximum mtime if requested
+     * similar the tar --clamp-mtime option. Setting it ouright avoids problems
+     * with an incorrectly older clock. It also avoids problems with build
+     * scrips that incorrectly change file mtimes when SOURCE_DATE_EPOCH_MTIME
+     * is in use.
      */
-    if (srcdate && rpmExpandNumeric("%{?clamp_mtime_to_source_date_epoch}")) {
+    if (srcdate && (rpmExpandNumeric("%{?clamp_mtime_to_source_date_epoch}")
+	|| rpmExpandNumeric("%{?set_mtime_to_source_date_epoch}"))) {
 	char *endptr;
 	errno = 0;
 	source_date_epoch = strtol(srcdate, &endptr, 10);
@@ -1049,6 +1069,9 @@ static void genCpioListAndHeader(FileList fl, Package pkg, int isSrc)
 	    fl->processingFailed = 1;
 	}
 	override_date = 1;
+	if (rpmExpandNumeric("%{?set_mtime_to_source_date_epoch}")) {
+	    set_mtime = 1;
+	}
     }
 
     /*
@@ -1191,8 +1214,8 @@ static void genCpioListAndHeader(FileList fl, Package pkg, int isSrc)
 		totalFileSize += flp->fl_size;
 	    }
 	}
-	
-	if (override_date && flp->fl_mtime > source_date_epoch) {
+
+	if (override_date && (flp->fl_mtime > source_date_epoch || set_mtime)) {
 	    flp->fl_mtime = source_date_epoch;
 	}
 	/*

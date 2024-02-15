@@ -94,13 +94,14 @@ Macro name                                      | Description
 `%_build_pkgcheck`                              | Progam to run on each generated binary package
 `%_build_pkcheck_set`                           | Program to run on the generated binary package set
 
-### Reproducability
+### Reproducibility
 
 Macro name                            | Description
 --------------------------------------|-----------
 `%source_date_epoch_from_changelog`   | Set `SOURCE_DATE_EPOCH` from latest `%changelog` entry
 `%use_source_date_epoch_as_buildtime` | Set package BuildTime to `SOURCE_DATE_EPOCH`
-`%clamp_mtime_to_source_date_epoch`   | Ensure file timestamps are not newer than `SOURCE_DATE_EPOCH`
+`%set_mtime_to_source_date_epoch`     | Set file modification timestamps to `SOURCE_DATE_EPOCH_MTIME` or as fallback to `SOURCE_DATE_EPOCH`
+`%clamp_mtime_to_source_date_epoch`   | You should use the above instead, it is for backwards compatibility only. Ensure file timestamps are not newer than `SOURCE_DATE_EPOCH`
 
 ### Vendor defaults
 
